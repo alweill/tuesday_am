@@ -1,0 +1,108 @@
+---
+title: "Classify-Raster-Data"
+author: "Allie Weill"
+date: "June 21, 2016"
+output: html_document
+---
+## Import Libraries
+```{r import-libraries}
+library(raster)
+library(rhdf5)
+library(rgdal)
+```
+
+## Import Canopy Height Model
+```{r import-canopy-height}
+# read LiDAR canopy height model
+chm <- raster("../NEONdata/D17-California/TEAK/2013/lidar/TEAK_lidarCHM.tif")
+```
+
+## View CHM
+```{r}
+# assign chm values of 0 to NA--take all of the 0 pixels and make them NA instead--so you can analyze all trees, for example
+chm[chm==0] <- NA
+
+# do the values in the data look reasonable?
+plot(chm,
+     main="Canopy Height \n LowerTeakettle, California")
+image(chm,
+      main = "These are just pixels and will stretch the space")
+hist(chm,
+     xlab="Tree Height")
+```
+
+## Import Aspect Data
+```{r import-aspect}
+aspect <- raster("../NEONdata/D17-California/TEAK/2013/lidar/TEAK_lidarAspect.tif")
+plot(aspect,
+     main="Aspect for Teakettle Field Site")
+```
+## Classify North and South Facing Slopes
+
+## Create Classification Mstrix
+```{r class-matrix}
+# first create a matrix of values that represent the classification ranges
+# North facing = 1
+# South facing = 2
+class.m <- c(0, 45, 1,
+             45, 135, NA,
+             135, 225, 2,  
+             225 , 315, NA,
+             315, 360, 1)
+class.m
+# reshape the object into a matrix with columns and rows
+rcl.m <- matrix(class.m, 
+                ncol=3, 
+                byrow=TRUE)
+rcl.m
+```
+## Reclassify the Raster
+```{r reclassify-raster}
+
+# reclassify the raster using the reclass object - rcl.m
+asp.ns <- reclassify(aspect, 
+                     rcl.m)
+# plot outside of the plot region
+# make room for a legend
+par(xpd = FALSE, mar=c(5.1, 4.1, 4.1, 4.5))
+# plot
+plot(asp.ns,
+     col=c("white","blue","orange"), # hard code colors, unclassified (0)=white,
+		 #N (1) =blue, S(2)=green
+     main="North and South Facing Slopes \nLower Teakettle",
+     legend=F)
+# allow legend to plot outside of bounds
+par(xpd=TRUE)
+# create the legend
+legend((par()$usr[2] + 20), 4103300,  # set x,y legend location
+       legend = c("North", "South"),  # make sure the order matches the colors, next
+       fill = c("blue", "orange"),
+       bty="n") # turn off border
+```
+## Export a Geotiff
+```{r export-geotiff, eval=FALSE}
+# export geotiff
+writeRaster(asp.ns,
+            filename="../NEONdata/outputs/TEAK/Teak_nsAspect2.tif",
+            format="GTiff",
+            ##compress file
+            options="COMPRESS=LZW",
+            ##remote sensing standard for NA
+            NAflag = -9999)
+```
+
+## Create a Raster Mask--this creates a mask layer, where we have the ndvi data only for pixels that have a north or south facing slope
+```{r raster-mask}
+ndvi <- raster("../NEONdata/D17-California/TEAK/2013/spectrometer/veg_index/TEAK_NDVI.tif")
+plot(ndvi,
+     main = "NDVI for Teakettle field Site")
+# mask data
+nFacing.ndvi <- mask(ndvi, 
+                     asp.ns)
+plot(nFacing.ndvi)
+```
+
+
+
+
+
